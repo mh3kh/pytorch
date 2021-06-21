@@ -10502,6 +10502,22 @@ class TestNN(NNTestCase):
         self.assertEqual(input.grad.dtype, dtype)
         self.assertEqual(input.grad, inputf.grad.to(dtype), atol=0.1, rtol=0)
 
+    def test_non_last_dim_softmax_cpu(self, dtype=torch.bfloat16):
+        inputf = torch.rand(32, 100, device="cpu", dtype=torch.float, requires_grad=True)
+        input = inputf.to(dtype).detach().requires_grad_(True)
+        label = torch.randint(0, 32, [100])
+
+        outf = F.softmax(inputf, dim=0).permute(1, 0).contiguous()
+        out = F.softmax(input, dim=0).permute(1, 0).contiguous()
+        self.assertEqual(out.dtype, dtype)
+        self.assertEqualIgnoreType(out, outf, atol=1e-2, rtol=0)
+
+        loss = torch.nn.NLLLoss()
+        loss(torch.log(outf), label).backward()
+        loss(torch.log(out), label).backward()
+        self.assertEqual(input.grad.dtype, dtype)
+        self.assertEqual(input.grad, inputf.grad.to(dtype), atol=1e-2, rtol=0)
+
     def test_adaptive_log_softmax(self):
         # args validation
         with self.assertRaises(ValueError):
